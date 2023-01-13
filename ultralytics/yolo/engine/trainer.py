@@ -3,7 +3,9 @@
 Simple training loop; Boilerplate that could apply to any arbitrary neural network,
 """
 
+import math
 import os
+import random
 import subprocess
 import time
 from collections import defaultdict
@@ -30,7 +32,7 @@ from ultralytics.yolo.data.utils import check_dataset, check_dataset_yaml
 from ultralytics.yolo.utils import (DEFAULT_CONFIG, LOGGER, RANK, SETTINGS, TQDM_BAR_FORMAT, callbacks, colorstr,
                                     yaml_save)
 from ultralytics.yolo.utils.autobatch import check_train_batch_size
-from ultralytics.yolo.utils.checks import check_file, print_args
+from ultralytics.yolo.utils.checks import check_file, print_args, check_img_size
 from ultralytics.yolo.utils.dist import ddp_cleanup, generate_ddp_command
 from ultralytics.yolo.utils.files import get_latest_run, increment_path
 from ultralytics.yolo.utils.torch_utils import ModelEMA, de_parallel, init_seeds, one_cycle, strip_optimizer
@@ -204,6 +206,10 @@ class BaseTrainer:
         if world_size > 1:
             self.model = DDP(self.model, device_ids=[rank])
 
+        # Image size
+        self.gs = max(int(self.model.stride.max()), 32)  # grid size (max stride)
+        self.imgsz = check_img_size(self.args.imgsz, self.gs, floor=self.gs * 2)  # verify imgsz is gs-multiple
+
         # Batch size
         if self.batch_size == -1:
             if RANK == -1:  # single-GPU only, estimate best batch size
@@ -293,6 +299,16 @@ class BaseTrainer:
                             ni, xi, [self.args.warmup_bias_lr if j == 0 else 0.0, x['initial_lr'] * self.lf(epoch)])
                         if 'momentum' in x:
                             x['momentum'] = np.interp(ni, xi, [self.args.warmup_momentum, self.args.momentum])
+
+
+                # Multi-scale
+                if self.args.multi_scale:
+                    sz = random.randrange(self.args.imgsz * 0.5, self.args.imgsz * 1.5 + self.gs) // self.gs * self.gs  # size
+                    sf = sz / max(imgs.shape[2:])  # scale factor
+                    if sf != 1:
+                        ns = [math.ceil(x * sf / self.gs) * self.gs for x in imgs.shape[2:]]  # new shape (stretched to gs-multiple)
+                        imgs = nn.functional.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
+
 
                 # Forward
                 with torch.cuda.amp.autocast(self.amp):

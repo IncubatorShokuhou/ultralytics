@@ -84,6 +84,7 @@ task.
 | fl_gamma        | 0.0     | focal loss gamma                                                            |
 | label_smoothing | 0.0     |                                                                             |
 | nbs             | 64      | nominal batch size                                                          |
+|multi_scale|`False`|vary img-size +/- 50%|
 | overlap_mask    | `True`  | **Segmentation**: Use mask overlapping during training                      |
 | mask_ratio      | 4       | **Segmentation**: Set mask downsampling                                     |
 | dropout         | `False` | **Classification**: Use dropout while training                              |

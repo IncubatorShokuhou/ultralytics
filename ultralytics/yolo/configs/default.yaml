@@ -29,6 +29,7 @@ rect: False # support rectangular training
 cos_lr: False # use cosine learning rate scheduler
 close_mosaic: 10 # disable mosaic augmentation for final 10 epochs
 resume: False # resume training from last checkpoint
+multi_scale: False # vary img-size +/- 50%
 # Segmentation
 overlap_mask: True # masks should overlap during training
 mask_ratio: 4 # mask downsample ratio
