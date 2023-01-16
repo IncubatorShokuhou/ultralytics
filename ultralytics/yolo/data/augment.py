@@ -538,17 +538,55 @@ class Albumentations:
         prefix = colorstr("albumentations: ")
         try:
             import albumentations as A
-
             check_version(A.__version__, "1.0.3", hard=True)  # version requirement
 
+            from albumentations import OneOf
+            from albumentations.augmentations.crops.transforms import RandomCrop, RandomSizedBBoxSafeCrop
+            from albumentations.augmentations.geometric.resize import LongestMaxSize
+            from albumentations.augmentations.geometric.rotate import RandomRotate90
+            from albumentations.augmentations.geometric.transforms import ShiftScaleRotate
+            from albumentations.augmentations.transforms import (CLAHE, Blur, GaussNoise, GridDistortion,
+                                                                 HorizontalFlip, HueSaturationValue, ImageCompression,
+                                                                 ISONoise, JpegCompression, MedianBlur, MotionBlur,
+                                                                 Normalize, OpticalDistortion, PadIfNeeded,
+                                                                 RandomBrightnessContrast, RandomGamma, RGBShift,
+                                                                 Transpose, VerticalFlip)
+            possibility_threshold = 0.2
             T = [
-                A.Blur(p=0.01),
-                A.MedianBlur(p=0.01),
-                A.ToGray(p=0.01),
-                A.CLAHE(p=0.01),
-                A.RandomBrightnessContrast(p=0.0),
-                A.RandomGamma(p=0.0),
-                A.ImageCompression(quality_lower=75, p=0.0),]  # transforms
+                    # 随机仿射变换
+                    ShiftScaleRotate(
+                        shift_limit=0.0625,
+                        scale_limit=0.1,
+                        rotate_limit=45,
+                        p=possibility_threshold,
+                    ),
+                    # 非破坏性转换
+                    HorizontalFlip(p=possibility_threshold),
+                    VerticalFlip(p=possibility_threshold),
+                    Transpose(p=possibility_threshold),
+                    RandomRotate90(p=possibility_threshold),
+                    # 模糊相关操作
+                    OneOf([
+                        MotionBlur(blur_limit=tuple([3, 7]),p=possibility_threshold), 
+                        MedianBlur(blur_limit=3, p=possibility_threshold),
+                        Blur(blur_limit=3, p=possibility_threshold),
+                    ], p=possibility_threshold),
+                    A.ToGray(p=possibility_threshold),
+                    A.CLAHE(p=possibility_threshold),
+                    A.RandomBrightnessContrast(p=possibility_threshold),
+                    A.RandomGamma(p=possibility_threshold),
+                    A.ImageCompression(quality_lower=75, p=possibility_threshold),
+                    OneOf([
+                        ISONoise(p=possibility_threshold),
+                        GaussNoise(p=possibility_threshold),
+                    ], p=possibility_threshold),
+                    RGBShift(
+                        r_shift_limit=30,
+                        g_shift_limit=30,
+                        b_shift_limit=30,
+                        p=possibility_threshold,
+                    ),] # transforms
+
             self.transform = A.Compose(T, bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"]))
 
             LOGGER.info(prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p))
